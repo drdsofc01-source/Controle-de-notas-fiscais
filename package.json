@@ -1,0 +1,14 @@
+{
+  "name": "solmar-logg-notas",
+  "version": "1.0.0",
+  "description": "Envio e controle de notas fiscais - SOL & MAR LOGG",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "archiver": "^7.0.1",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5"
+  }
+}

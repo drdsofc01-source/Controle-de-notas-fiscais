@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex"><title>SOL & MAR LOGG — Acesso Master</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="hero"><h1>SOL <b>&amp;</b> MAR LOGG</h1><p>Acesso Master</p></div>
+<div class="wrap"><div id="v" class="card"></div></div><div id="md" class="ov" hidden></div>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const brl=n=>n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}),fd=x=>x?x.split('-').reverse().join('/'):'',dg=x=>String(x||'').replace(/\D/g,'');
+const ML=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'],mlab=k=>ML[+k.slice(5,7)-1]+'/'+k.slice(0,4),mes=n=>n.emissao.slice(0,7);
+const mask=x=>{const d=dg(x).slice(0,14);if(d.length<=11)return d.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');return d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')};
+const msg=(el,t,c)=>el.innerHTML=`<div class="msg ${c}">${t}</div>`;
+let notas=[],sel=null,st='';
+async function api(u,o={}){const r=await fetch(u,{...o,headers:{'X-Requested-With':'fetch','Content-Type':'application/json'},body:o.body?JSON.stringify(o.body):undefined});
+const j=await r.json().catch(()=>({}));if(!r.ok){if(r.status==401&&u!='/api/master/login')login();throw new Error(j.erro||'Erro '+r.status)}return j}
+function modal(h){const m=$('#md');m.innerHTML='<div class="box">'+h+'</div>';m.hidden=false;return m}
+function login(){$('#md').hidden=true;$('#v').innerHTML=`<h2 style="margin:0">Login</h2><label>Usuário</label><input id="us" autocomplete="username" autocapitalize="none"><label>Senha</label><input id="pw" type="password" autocomplete="current-password"><button class="btn block" id="go">🔓 Login</button><div id="m2"></div>`;
+const go=async()=>{try{await api('/api/master/login',{method:'POST',body:{user:$('#us').value,pass:$('#pw').value}});await carregar()}catch(e){msg($('#m2'),esc(e.message),'er')}};
+$('#go').onclick=go;$('#pw').onkeydown=e=>{if(e.key=='Enter')go()}}
+async function carregar(){notas=await api('/api/master/notas');painel()}
+function stat(n){if(!n.conf)return'<span class="mut">Não verificado</span>';if(n.conf=='ok')return'<span class="o">✅ Conferido</span>';
+return n.conf=='erro'?'<span class="w">❔ Não foi possível ler</span>':'<span class="w">⚠️ Divergência</span><ul>'+(n.insc||[]).map(x=>`<li>${esc(x)}</li>`).join('')+'</ul>'}
+function painel(){const ms=[...new Set(notas.map(mes))].sort().reverse();if(!sel&&ms.length)sel={a:ms[0],b:ms[0]};
+const L=sel?notas.filter(n=>mes(n)>=sel.a&&mes(n)<=sel.b):[],q=sel?`de=${sel.a}&ate=${sel.b}`:'',v=$('#v');
+v.innerHTML=`<div class="top"><h2 style="margin:0">Notas recebidas</h2><div class="row"><button class="btn y" id="cfg">⚙️ Configurações</button><button class="btn" id="out">🔒 Sair (logout)</button></div></div>
+<div class="chips">${ms.map(k=>`<button class="chip ${sel&&sel.a==k&&sel.b==k?'on':''}" data-k="${k}">${mlab(k)}</button>`).join('')||'<span class="mut">Nenhuma nota enviada ainda.</span>'}</div>
+<div class="bar"><div><label>De</label><input type="month" id="de" value="${sel?sel.a:''}"></div><div><label>Até</label><input type="month" id="ate" value="${sel?sel.b:''}"></div></div>
+<div class="tw"><table><tr><th>Nome</th><th>CPF/CNPJ</th><th>Nº</th><th>Valor</th><th>Emissão</th><th>Compet.</th><th>Inconsistências</th><th>Arquivo</th><th></th></tr>${L.map(n=>`<tr><td>${esc(n.nome)}</td><td>${mask(n.doc)}</td><td>${esc(n.numero)}</td><td>${brl(n.valor)}</td><td>${fd(n.emissao)}</td><td>${mlab(n.comp)}</td><td>${stat(n)}</td><td>${esc(n.arquivo)}</td>
+<td style="white-space:nowrap"><a class="ib" href="/api/master/notas/${n.id}/arquivo" title="Baixar">⬇️</a> <button class="ib" data-c="${n.id}" title="Conferir nota">🔍</button> <button class="ib" data-e="${n.id}" title="Editar">✏️</button> <button class="ib" data-x="${n.id}" title="Excluir">🗑️</button></td></tr>`).join('')}</table></div>
+<div class="tot">${L.length} nota(s) · Total ${brl(L.reduce((s,n)=>s+n.valor,0))}</div>
+<div class="row"><a class="btn y" href="/api/master/zip?${q}" ${L.length?'':'style="pointer-events:none;opacity:.5"'}>⬇️ Baixar todas do período</a><a class="btn" href="/api/master/excel?${q}" ${L.length?'':'style="pointer-events:none;opacity:.5"'}>📊 Exportar Excel</a><button class="btn y" id="ck" ${L.length?'':'disabled'}>🔍 Conferir todas do período</button></div><div id="m3">${st}</div>`;
+v.querySelectorAll('.chip').forEach(b=>b.onclick=()=>{sel={a:b.dataset.k,b:b.dataset.k};painel()});
+$('#de').onchange=e=>{sel={a:e.target.value,b:e.target.value>(sel?.b||'')?e.target.value:sel.b};painel()};$('#ate').onchange=e=>{sel={a:sel?.a||e.target.value,b:e.target.value};painel()};
+v.querySelectorAll('[data-e]').forEach(b=>b.onclick=()=>editar(notas.find(n=>n.id==b.dataset.e)));v.querySelectorAll('[data-x]').forEach(b=>b.onclick=()=>excluir(notas.find(n=>n.id==b.dataset.x)));
+v.querySelectorAll('[data-c]').forEach(b=>b.onclick=()=>conferir([notas.find(n=>n.id==b.dataset.c)]));$('#ck').onclick=()=>conferir(L);
+$('#out').onclick=async()=>{await api('/api/master/logout',{method:'POST'});notas=[];sel=null;st='';login()};$('#cfg').onclick=acessos}
+async function conferir(L){let i=0;try{for(const n of L){i++;st=`<div class="msg ok">Conferindo ${i}/${L.length}…</div>`;const e=$('#m3');if(e)e.innerHTML=st;const r=await api(`/api/master/notas/${n.id}/conferir`,{method:'POST',body:{}});notas=notas.map(x=>x.id==r.id?r:x)}st='<div class="msg ok">Conferência concluída.</div>'}catch(e){st=`<div class="msg er">${esc(e.message)}</div>`}painel()}
+function editar(n){const m=modal(`<h3 style="margin:0">Editar nota</h3><label>Nome ou razão social</label><input id="en" value="${esc(n.nome)}"><label>CPF/CNPJ</label><input id="edc" inputmode="numeric" value="${mask(n.doc)}"><label>Número da nota</label><input id="enu" value="${esc(n.numero)}"><label>Valor (R$)</label><input id="ev" inputmode="decimal" value="${n.valor.toFixed(2).replace('.',',')}"><label>Data de emissão</label><input id="ed" type="date" value="${n.emissao}"><label>Competência</label><input id="ecp" type="month" value="${n.comp}"><label>Descrição</label><input id="eds" value="${esc(n.desc||'')}"><p class="mut">O nome do arquivo será atualizado e a conferência será refeita.</p><div class="row"><button class="btn y" id="es">Salvar</button><button class="btn" id="ec">Cancelar</button></div><div id="me"></div>`);
+$('#edc').oninput=e=>e.target.value=mask(e.target.value);$('#ec').onclick=()=>m.hidden=true;
+$('#es').onclick=async()=>{try{const r=await api('/api/master/notas/'+n.id,{method:'PUT',body:{nome:$('#en').value,doc:$('#edc').value,numero:$('#enu').value,valor:$('#ev').value,emissao:$('#ed').value,comp:$('#ecp').value,desc:$('#eds').value}});notas=notas.map(x=>x.id==r.id?r:x);m.hidden=true;painel()}catch(e){msg($('#me'),esc(e.message),'er')}}}
+function excluir(n){const m=modal(`<h3 style="margin:0">Excluir nota?</h3><p>${esc(n.nome)} — ${brl(n.valor)}<br><span class="mut">${esc(n.arquivo)}</span></p><p class="mut">O arquivo anexado também será apagado. Não dá para desfazer.</p><div class="row"><button class="btn r" id="xs">Excluir</button><button class="btn" id="xc">Cancelar</button></div><div id="mx"></div>`);
+$('#xc').onclick=()=>m.hidden=true;$('#xs').onclick=async()=>{try{await api('/api/master/notas/'+n.id,{method:'DELETE'});notas=notas.filter(x=>x.id!=n.id);m.hidden=true;painel()}catch(e){msg($('#mx'),esc(e.message),'er')}}}
+async function acessos(){const d=await api('/api/master/usuarios'),l=d.lista;const m=modal(`<h3 style="margin:0">⚙️ Acessos Master</h3><p class="mut">Máximo de ${d.max} acessos (${l.length}/${d.max}).</p><table style="min-width:0">${l.map(x=>`<tr><td>${esc(x.u)}${x.id==d.eu?' <span class="mut">(você)</span>':''}</td><td style="white-space:nowrap;text-align:right"><button class="ib" data-ue="${x.id}">✏️</button> <button class="ib" data-ux="${x.id}">🗑️</button></td></tr>`).join('')}</table><br><div class="row"><button class="btn y" id="un" ${l.length>=d.max?'disabled':''}>➕ Novo acesso</button><button class="btn" id="uc">Fechar</button></div><div id="mu"></div>`);
+$('#uc').onclick=()=>m.hidden=true;$('#un').onclick=()=>formUser(null);
+m.querySelectorAll('[data-ue]').forEach(b=>b.onclick=()=>formUser(l.find(x=>x.id==b.dataset.ue)));
+m.querySelectorAll('[data-ux]').forEach(b=>b.onclick=async()=>{const x=l.find(y=>y.id==b.dataset.ux);if(!confirm('Excluir o acesso "'+x.u+'"?'))return;try{await api('/api/master/usuarios/'+x.id,{method:'DELETE'});x.id==d.eu?login():acessos()}catch(e){msg($('#mu'),esc(e.message),'er')}})}
+function formUser(u){const m=modal(`<h3 style="margin:0">${u?'Editar acesso':'Novo acesso'}</h3><label>Usuário</label><input id="fu" value="${u?esc(u.u):''}" autocapitalize="none" autocomplete="off"><label>${u?'Nova senha (em branco = manter)':'Senha (mín. 6 caracteres)'}</label><input id="fp" type="password" autocomplete="new-password"><div class="row" style="margin-top:16px"><button class="btn y" id="fs">Salvar</button><button class="btn" id="fb">Voltar</button></div><div id="mf"></div>`);
+$('#fb').onclick=acessos;$('#fs').onclick=async()=>{try{await api('/api/master/usuarios'+(u?'/'+u.id:''),{method:u?'PUT':'POST',body:{u:$('#fu').value,p:$('#fp').value}});acessos()}catch(e){msg($('#mf'),esc(e.message),'er')}}}
+api('/api/master/me').then(carregar).catch(login);
+</script></body></html>

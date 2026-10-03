@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>SOL & MAR LOGG — Envio de Notas Fiscais</title><link rel="stylesheet" href="/style.css"></head><body>
+<div class="hero"><h1>SOL <b>&amp;</b> MAR LOGG</h1><p>Envio de notas fiscais</p></div>
+<div class="wrap"><form id="f" class="card" autocomplete="off" novalidate>
+<h2 style="margin:0">Enviar nota fiscal</h2>
+<label>Nome ou razão social do prestador</label><input name="nome" id="nome" autocomplete="name" required>
+<label>CPF ou CNPJ</label><input name="doc" id="doc" inputmode="numeric" placeholder="000.000.000-00 ou 00.000.000/0000-00" required>
+<label>Número da nota</label><input name="numero" inputmode="numeric" required>
+<label>Valor da nota (R$)</label><input name="valor" inputmode="decimal" placeholder="1500,00" required>
+<label>Data de emissão</label><input name="emissao" type="date" required>
+<label>Competência (mês de referência)</label><input name="comp" type="month" required>
+<label>Descrição do serviço (opcional)</label><input name="desc" maxlength="300">
+<label>Anexar nota (PDF, JPG, PNG ou XML — até 5 MB)</label><input name="arquivo" id="arquivo" type="file" accept=".pdf,.png,.jpg,.jpeg,.xml,application/pdf,image/*" required>
+<div class="hp" aria-hidden="true"><input name="site" tabindex="-1" autocomplete="off"></div>
+<button class="btn y block" id="env">Enviar nota</button><div id="m"></div>
+<p class="mut">O arquivo é renomeado automaticamente com seu nome, valor e mês/ano de emissão.</p>
+</form></div>
+<script>
+const $=s=>document.querySelector(s),dg=x=>x.replace(/\D/g,'');
+const mask=x=>{const d=dg(x).slice(0,14);if(d.length<=11)return d.replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d)/,'$1.$2').replace(/(\d{3})(\d{1,2})$/,'$1-$2');return d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')};
+function validDoc(d){if(/^(\d)\1+$/.test(d))return false;
+if(d.length==11){const r=i=>{let t=0;for(let k=0;k<i;k++)t+=d[k]*(i+1-k);return t*10%11%10};return r(9)==d[9]&&r(10)==d[10]}
+if(d.length==14){const c=n=>{let t=0,p=n-7;for(let k=0;k<n;k++){t+=d[k]*p--;if(p<2)p=9}const x=t%11;return x<2?0:11-x};return c(12)==d[12]&&c(13)==d[13]}return false}
+const msg=(t,c)=>$('#m').innerHTML=`<div class="msg ${c}">${t}</div>`;
+$('#doc').addEventListener('input',e=>e.target.value=mask(e.target.value));
+$('#f').addEventListener('submit',async e=>{e.preventDefault();const f=$('#arquivo').files[0];
+if(!e.target.checkValidity())return msg('Preencha todos os campos obrigatórios.','er');
+if(!validDoc(dg($('#doc').value)))return msg('CPF/CNPJ inválido. Confira os números.','er');
+if(f.size>5*1024*1024)return msg('Arquivo acima de 5 MB. Envie uma versão menor.','er');
+const fd=new FormData(e.target);fd.set('doc',dg($('#doc').value));$('#env').disabled=true;msg('Enviando…','ok');
+try{const r=await fetch('/api/notas',{method:'POST',body:fd}),j=await r.json().catch(()=>({}));
+if(!r.ok)msg(j.erro||'Falha no envio. Tente novamente.','er');else{msg('✅ Nota enviada com sucesso!'+(j.arquivo?'<br>Arquivo: <b>'+j.arquivo+'</b>':''),'ok');e.target.reset()}}
+catch{msg('Sem conexão. Tente novamente.','er')}$('#env').disabled=false});
+</script></body></html>
