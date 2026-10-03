@@ -64,8 +64,13 @@ const sniff = (b, ex) => ex === '.pdf' ? b.slice(0, 5).toString() === '%PDF-' : 
 const app = express();
 app.set('trust proxy', 1);
 app.use(express.json({ limit: '100kb' }));
-app.use(express.static(path.join(__dirname, 'public')));
-app.get('/master', (q, r) => r.sendFile(path.join(__dirname, 'public', 'master.html')));
+// Páginas e arquivos do site: procura em ./public e, se não achar, na raiz (aceita upload "solto" no GitHub)
+const loc = f => [path.join(__dirname, 'public', f), path.join(__dirname, f)].find(p => fs.existsSync(p));
+const envia = f => (q, r) => { const p = loc(f); p ? r.sendFile(p) : r.status(404).send('Arquivo ' + f + ' não encontrado no repositório.'); };
+app.get(['/', '/index.html'], envia('index.html'));
+app.get('/master', envia('master.html'));
+app.get('/style.css', envia('style.css'));
+app.get('/hero.jpg', envia('hero.jpg'));
 
 // ---------- ENVIO PÚBLICO (sem login) ----------
 const up = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024, files: 1 } });
